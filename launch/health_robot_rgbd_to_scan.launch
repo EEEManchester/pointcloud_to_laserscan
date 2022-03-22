@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+
+<launch>
+
+
+    <!-- run pointcloud_to_laserscan node -->
+    <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">
+
+        <remap from="cloud_in" to="rb1_base/front_rgbd_camera/depth/points"/>
+        <remap from="scan" to="front_rgbd_camera/scan"/>
+        <rosparam>
+            target_frame: rb1_base_front_rgbd_camera_rgb_base_link # Leave disabled to output scan in pointcloud frame
+            transform_tolerance: 0.1
+            min_height: -0.05
+            max_height: 0.5
+
+            angle_min: -0.8 # -M_PI/2
+            angle_max: 0.8 # M_PI/2
+            angle_increment: 0.01 # M_PI/360.0
+            scan_time: 0.0333
+            range_min: 0.30
+            range_max: 2.0
+            use_inf: false
+            inf_epsilon: 1.0
+
+            # Concurrency level, affects number of pointclouds queued for processing and number of threads used
+            # 0 : Detect number of cores
+            # 1 : Single threaded
+            # 2->inf : Parallelism level
+            concurrency_level: 10
+        </rosparam>
+
+    </node>
+
+</launch>

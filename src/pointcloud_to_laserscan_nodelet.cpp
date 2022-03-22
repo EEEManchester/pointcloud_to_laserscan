@@ -45,6 +45,11 @@
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <string>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/point_types.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/conversions.h>
 
 namespace pointcloud_to_laserscan
 {
@@ -54,6 +59,7 @@ PointCloudToLaserScanNodelet::PointCloudToLaserScanNodelet()
 
 void PointCloudToLaserScanNodelet::onInit()
 {
+
   boost::mutex::scoped_lock lock(connect_mutex_);
   private_nh_ = getPrivateNodeHandle();
 
@@ -85,14 +91,15 @@ void PointCloudToLaserScanNodelet::onInit()
   }
 
   // Only queue one pointcloud per running thread
-  if (concurrency_level > 0)
-  {
-    input_queue_size_ = concurrency_level;
-  }
-  else
-  {
-    input_queue_size_ = boost::thread::hardware_concurrency();
-  }
+  // if (concurrency_level > 0)
+  // {
+  //   input_queue_size_ = concurrency_level;
+  // }
+  // else
+  // {
+  //   input_queue_size_ = boost::thread::hardware_concurrency();
+  // }
+  input_queue_size_ = 1;
 
   // if pointcloud target frame specified, we need to filter by transform availability
   if (!target_frame_.empty())
@@ -143,6 +150,7 @@ void PointCloudToLaserScanNodelet::failureCb(const sensor_msgs::PointCloud2Const
 
 void PointCloudToLaserScanNodelet::cloudCb(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
+  ROS_INFO( "got scan ");
   // build laserscan output
   sensor_msgs::LaserScan output;
   output.header = cloud_msg->header;
@@ -195,9 +203,31 @@ void PointCloudToLaserScanNodelet::cloudCb(const sensor_msgs::PointCloud2ConstPt
     cloud_out = cloud_msg;
   }
 
+ROS_WARN( "CONVERSION STARTED " );
+ 
+  pcl::PCLPointCloud2 cloud_in;
+  pcl::PCLPointCloud2::Ptr cloud_in_Ptr (new pcl::PCLPointCloud2 ());
+  pcl_conversions::toPCL(*cloud_out,cloud_in);
+  
+  pcl::PCLPointCloud2 cloud_filtered;
+
+  *cloud_in_Ptr = cloud_in;
+  
+  // Perform the actual filtering
+  pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+  sor.setInputCloud (cloud_in_Ptr);
+  sor.setLeafSize (0.05, 0.05, 0.05);
+  sor.filter (cloud_filtered);
+
+  
+  sensor_msgs::PointCloud2 fil_cloud;
+  pcl_conversions::fromPCL(cloud_filtered,fil_cloud);
+  
+  ROS_WARN( "CONVERSION DONE " );
+
   // Iterate through pointcloud
-  for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(*cloud_out, "x"), iter_y(*cloud_out, "y"),
-       iter_z(*cloud_out, "z");
+  for (sensor_msgs::PointCloud2ConstIterator<float> iter_x(fil_cloud, "x"), iter_y(fil_cloud, "y"),
+       iter_z(fil_cloud, "z");
        iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
   {
     if (std::isnan(*iter_x) || std::isnan(*iter_y) || std::isnan(*iter_z))
